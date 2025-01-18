@@ -1,4 +1,4 @@
-const db = require("../config/db");
+const { db } = require("../config/db");
 
 const getPositions = (callback) => {
   const query = `SELECT tp.* FROM tc_devices tc LEFT JOIN tc_positions tp ON tc.positionid = tp.id`;

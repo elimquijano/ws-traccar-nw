@@ -4,6 +4,7 @@ const http = require("http");
 const { getPositions } = require("./controllers/positionsController");
 const { getAlerts } = require("./controllers/alertController");
 const { getData } = require("./config/constantes");
+const { getDetails } = require("./controllers/detailsController");
 
 const app = express();
 const server = http.createServer(app);
@@ -16,6 +17,7 @@ const timeStep = 5000; // 5 seconds
 const PORT = 3050;
 
 // Global storage for latest data
+let details = [];
 const latestData = {
   positions: [],
   alerts: [],
@@ -23,6 +25,13 @@ const latestData = {
 
 // Single interval for data fetching
 const startDataFetching = () => {
+  // Initial details fetch with callback
+  getDetails((err, detailsData) => {
+    if (!err) {
+      details = detailsData || [];
+    }
+  });
+  
   setInterval(() => {
     // Fetch positions
     getPositions((err, positions) => {
@@ -51,7 +60,13 @@ wsServer.on("request", async (request) => {
     return;
   }
 
-  let devices = await getData(username, password);
+  getDetails((err, detailsData) => {
+    if (!err) {
+      details = detailsData || [];
+    }
+  });
+  
+  let devices = await getData(username, password, details);
   if (!devices) {
     request.reject();
     console.log("Connection rejected: Invalid credentials");
@@ -66,7 +81,7 @@ wsServer.on("request", async (request) => {
   switch (path) {
     case "/positions":
       const enrichPositions = async () => {
-        devices = await getData(username, password);
+        devices = await getData(username, password, details);
         const enrichedPositions = latestData.positions
           .filter((position) =>
             devices.some((device) => device.id === position.deviceid)
@@ -78,6 +93,7 @@ wsServer.on("request", async (request) => {
             return {
               ...position,
               attributes: JSON.parse(position.attributes),
+              icon: device.icon,
               deviceName: device.name,
               deviceModel: device.model,
               deviceStatus: device.status,
