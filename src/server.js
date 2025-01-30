@@ -5,6 +5,8 @@ const { getPositions } = require("./controllers/positionsController");
 const { getAlerts } = require("./controllers/alertController");
 const { getData } = require("./config/constantes");
 const { getDetails } = require("./controllers/detailsController");
+const { detectVehicleChanges } = require("./controllers/devicesController");
+const { sendNotifications } = require("./controllers/notificacionController");
 
 const app = express();
 const server = http.createServer(app);
@@ -15,6 +17,25 @@ const wsServer = new WebSocket({
 
 const timeStep = 5000; // 5 seconds
 const PORT = 3050;
+
+// HTTP SERVER
+
+// Middleware para parsear el cuerpo de las solicitudes JSON
+app.use(express.json());
+
+// API POST NOTIFICACIONES
+app.post("/api/notificacion", (req, res) => {
+  const { deviceid, titulo, mensaje } = req.body;
+  sendNotifications(deviceid, titulo, mensaje, (err, result) => {
+    if (err) {
+      res.status(500).json(err);
+    } else {
+      res.status(200).json(result);
+    }
+  });
+});
+
+// WEBSOCKET SERVER
 
 // Global storage for latest data
 let details = [];
@@ -31,7 +52,7 @@ const startDataFetching = () => {
       details = detailsData || [];
     }
   });
-  
+
   setInterval(() => {
     // Fetch positions
     getPositions((err, positions) => {
@@ -60,12 +81,12 @@ wsServer.on("request", async (request) => {
     return;
   }
 
-  getDetails((err, detailsData) => {
+  /* getDetails((err, detailsData) => {
     if (!err) {
       details = detailsData || [];
     }
-  });
-  
+  }); */
+
   let devices = await getData(username, password, details);
   if (!devices) {
     request.reject();
@@ -81,7 +102,15 @@ wsServer.on("request", async (request) => {
   switch (path) {
     case "/positions":
       const enrichPositions = async () => {
+        const beforeDevices = devices;
         devices = await getData(username, password, details);
+        const changes = detectVehicleChanges(beforeDevices, devices);
+
+        // Enviar los eventos detectados
+        changes.forEach((change) => {
+          connection.send(JSON.stringify(change));
+        });
+
         const enrichedPositions = latestData.positions
           .filter((position) =>
             devices.some((device) => device.id === position.deviceid)
@@ -114,6 +143,7 @@ wsServer.on("request", async (request) => {
         enrichPositions();
       }, timeStep);
       break;
+
     case "/alerts":
       const enrichAlerts = () => {
         // Filter and combine data
@@ -147,6 +177,55 @@ wsServer.on("request", async (request) => {
         enrichAlerts();
       }, timeStep);
       break;
+
+    case "/events":
+      connection.on("message", async (message) => {
+        if (message.type === "utf8") {
+          try {
+            const data = JSON.parse(message.utf8Data);
+
+            switch (data.event) {
+              case "sos":
+                const deviceStatus = devices.find(
+                  (device) => device.id === data.deviceId
+                );
+                if (deviceStatus) {
+                  connection.send(
+                    JSON.stringify({
+                      event: "deviceStatus",
+                      data: deviceStatus,
+                    })
+                  );
+                } else {
+                  connection.send(
+                    JSON.stringify({
+                      event: "error",
+                      message: "Device not found",
+                    })
+                  );
+                }
+                break;
+              default:
+                connection.send(
+                  JSON.stringify({
+                    event: "error",
+                    message: "Unknown event type",
+                  })
+                );
+            }
+          } catch (error) {
+            console.error("Error processing event:", error);
+            connection.send(
+              JSON.stringify({
+                event: "error",
+                message: "Error processing request",
+              })
+            );
+          }
+        }
+      });
+      break;
+
     default:
       connection.send(JSON.stringify({ error: "Invalid path" }));
       connection.close();
