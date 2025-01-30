@@ -2,7 +2,7 @@ const express = require("express");
 const WebSocket = require("websocket").server;
 const http = require("http");
 const { getPositions } = require("./controllers/positionsController");
-const { getAlerts } = require("./controllers/alertController");
+const { getAlerts, createEventSos } = require("./controllers/alertController");
 const { getData } = require("./config/constantes");
 const { getDetails } = require("./controllers/detailsController");
 const { detectVehicleChanges } = require("./controllers/devicesController");
@@ -16,7 +16,7 @@ const wsServer = new WebSocket({
 });
 
 const timeStep = 5000; // 5 seconds
-const PORT = 3050;
+const PORT = 7006;
 
 // HTTP SERVER
 
@@ -27,6 +27,18 @@ app.use(express.json());
 app.post("/api/notificacion", (req, res) => {
   const { deviceid, titulo, mensaje } = req.body;
   sendNotifications(deviceid, titulo, mensaje, (err, result) => {
+    if (err) {
+      res.status(500).json(err);
+    } else {
+      res.status(200).json(result);
+    }
+  });
+});
+
+// API POST SOS
+app.post("/api/sos", (req, res) => {
+  const { deviceid } = req.body;
+  createEventSos(deviceid, (err, result) => {
     if (err) {
       res.status(500).json(err);
     } else {
