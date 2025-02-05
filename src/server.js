@@ -73,7 +73,11 @@ const startDataFetching = () => {
 
     // Fetch alerts
     getAlerts(timeStep, (err, alerts) => {
-      if (!err) latestData.alerts = alerts;
+      if (!err) {
+        const existingIds = new Set(latestData.alerts.map((alert) => alert.id));
+        const newAlerts = alerts.filter((alert) => !existingIds.has(alert.id));
+        latestData.alerts = newAlerts;
+      }
     });
   }, timeStep);
 };

@@ -12,7 +12,7 @@ const getAlerts = (timeStep, callback) => {
 
   isQueryInProgress = true;
 
-  const secondsToSubtract = (2 * timeStep) / 1000;
+  const secondsToSubtract = 1 + (2 * timeStep) / 1000;
   const now = new Date();
   now.setSeconds(now.getSeconds() - secondsToSubtract);
   const fiveSecondsAgo = now.toISOString().slice(0, 19).replace("T", " ");
@@ -62,7 +62,8 @@ const createEventSos = (deviceId, callback) => {
               sendNotifications(
                 deviceId,
                 "¡ALERTA DE SOS!",
-                "Se ha activado una alerta de SOS en su vehiculo: " + vehicleName,
+                "Se ha activado una alerta de SOS en su vehiculo: " +
+                  vehicleName,
                 (err, result) => {
                   if (err) {
                     callback(err, null);
