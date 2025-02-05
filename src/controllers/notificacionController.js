@@ -79,11 +79,13 @@ const sendPushNotifications = async (
     }
 
     const notificationPromises = users.map((user) => {
-      return new Promise((resolve, reject) => {
-        sendPushNotification(user.token, titulo, mensaje, deviceid, (err) => {
-          if (err) return reject(err);
+      return new Promise(async (resolve, reject) => {
+        try {
+          await sendPushNotification(user.token, titulo, mensaje, deviceid);
           resolve();
-        });
+        } catch (error) {
+          reject(error);
+        }
       });
     });
 
@@ -91,12 +93,14 @@ const sendPushNotifications = async (
 
     callback(null, { message: "Push notifications sent successfully." });
   } catch (error) {
-    callback(error);
+    callback({
+      message: "Error sending push notifications.",
+      error: error.message,
+    });
   }
 };
 
-const sendSms = (traccar_id, titulo, mensaje, callback) => {
-  // Configuración de la solicitud GET para obtener los datos del usuario
+const sendSms = async (traccar_id, titulo, mensaje, callback) => {
   const configGet = {
     method: "get",
     maxBodyLength: Infinity,
@@ -105,55 +109,48 @@ const sendSms = (traccar_id, titulo, mensaje, callback) => {
       Authorization: `Basic ${process.env.TRACCAR_API_TOKEN}`,
       "Content-Type": "application/json",
     },
+    timeout: 10000, // Establecer un timeout de 10 segundos
   };
 
-  // Realizar la solicitud GET para obtener los datos del usuario
-  axios
-    .request(configGet)
-    .then((response) => {
-      const phone = response.data.phone;
+  try {
+    const response = await axios.request(configGet);
+    const phone = response.data.phone;
 
-      // Verificar si el número de teléfono existe y tiene 9 caracteres
-      if (!phone || phone.length !== 9) {
-        console.warn(
-          `El número de teléfono para el usuario ${traccar_id} no es válido.`
-        );
-        return callback(null, { message: "Número de teléfono no válido." });
-      }
+    if (!phone || phone.length !== 9) {
+      console.warn(
+        `El número de teléfono para el usuario ${traccar_id} no es válido.`
+      );
+      return callback(null, { message: "Número de teléfono no válido." });
+    }
 
-      // Preparar los datos del SMS tal como funcionan en Postman
-      const smsData = {
-        token: process.env.TOKEN_API_SMS, // Asegúrate de que este valor es correcto o usa process.env.TOKEN_API_SMS si está definido
-        tipe: "sms", // Mantener "tipe" como en Postman
-        number_s: phone,
-        body: `${titulo}, ${mensaje}`,
-      };
+    const smsData = {
+      token: process.env.TOKEN_API_SMS,
+      tipe: "sms",
+      number_s: phone,
+      body: `${titulo}, ${mensaje}`,
+    };
 
-      // Configuración de la solicitud POST para enviar el SMS
-      const configPost = {
-        method: "post",
-        maxBodyLength: Infinity,
-        url: process.env.BASE_URL_SMS, // Asegúrate de que esta URL es correcta
-        headers: {
-          "Content-Type": "application/json",
-        },
-        data: JSON.stringify(smsData),
-      };
+    const configPost = {
+      method: "post",
+      maxBodyLength: Infinity,
+      url: process.env.BASE_URL_SMS,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      data: JSON.stringify(smsData),
+      timeout: 10000, // Establecer un timeout de 10 segundos
+    };
 
-      // Realizar la solicitud POST para enviar el SMS
-      return axios.request(configPost);
-    })
-    .then((response) => {
-      callback(null, response.data);
-    })
-    .catch((error) => {
-      if (error.response) {
-        console.error("Error de la API de SMS:", error.response.data);
-      } else {
-        console.error("Error al enviar SMS:", error.message);
-      }
-      callback(error);
-    });
+    const smsResponse = await axios.request(configPost);
+    callback(null, smsResponse.data);
+  } catch (error) {
+    if (error.response) {
+      console.error("Error de la API de SMS:", error.response.data);
+    } else {
+      console.error("Error al enviar SMS:", error.message);
+    }
+    callback(error);
+  }
 };
 
 const fetchUsersOfDevice = (deviceid, callback) => {
@@ -205,8 +202,8 @@ const sendNotifications = async (deviceid, titulo, mensaje, callback) => {
           }), */
         ]);
         return { user: traccar_id, status: "success" };
-      } catch {
-        return { user: traccar_id, status: "failed" };
+      } catch (error) {
+        return { user: traccar_id, status: "failed", error: error.message };
       }
     });
 
@@ -229,7 +226,7 @@ const sendNotifications = async (deviceid, titulo, mensaje, callback) => {
       );
     }
   } catch (error) {
-    callback({ message: "Error fetching users.", error }, null);
+    callback({ message: "Error fetching users.", error: error.message }, null);
   }
 };
 
