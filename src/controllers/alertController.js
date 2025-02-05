@@ -12,7 +12,7 @@ const getAlerts = (timeStep, callback) => {
 
   isQueryInProgress = true;
 
-  const secondsToSubtract = 1 + (2 * timeStep) / 1000;
+  const secondsToSubtract = (4 * timeStep) / 1000;
   const now = new Date();
   now.setSeconds(now.getSeconds() - secondsToSubtract);
   const fiveSecondsAgo = now.toISOString().slice(0, 19).replace("T", " ");
@@ -20,7 +20,7 @@ const getAlerts = (timeStep, callback) => {
   const query = `
     SELECT te.*, tp.latitude, tp.longitude 
     FROM tc_events te 
-    JOIN tc_positions tp ON te.positionid = tp.id 
+    LEFT JOIN tc_positions tp ON te.positionid = tp.id 
     WHERE eventtime >= '${fiveSecondsAgo}'
   `;
 

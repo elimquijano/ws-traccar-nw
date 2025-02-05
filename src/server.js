@@ -77,6 +77,10 @@ const startDataFetching = () => {
         const existingIds = new Set(latestData.alerts.map((alert) => alert.id));
         const newAlerts = alerts.filter((alert) => !existingIds.has(alert.id));
         latestData.alerts = newAlerts;
+        console.log(
+          new Date().toISOString().slice(0, 19).replace("T", " "),
+          newAlerts.map((alert) => alert.id)
+        );
       }
     });
   }, timeStep);
@@ -161,6 +165,9 @@ wsServer.on("request", async (request) => {
       break;
 
     case "/alerts":
+      let sentAlertIds = [];
+      const maxIterations = 3;
+
       const enrichAlerts = () => {
         // Filter and combine data
         const enrichedAlerts = latestData.alerts
@@ -181,8 +188,25 @@ wsServer.on("request", async (request) => {
             };
           });
 
+        // Filter out already sent alerts
+        const newAlerts = enrichedAlerts.filter(
+          (alert) => !sentAlertIds.includes(alert.id)
+        );
+
         // Send combined data
-        connection.send(JSON.stringify({ alerts: enrichedAlerts }));
+        connection.send(JSON.stringify({ alerts: newAlerts }));
+
+        // Update sent alert IDs
+        sentAlertIds = [
+          ...new Set([...sentAlertIds, ...newAlerts.map((alert) => alert.id)]),
+        ];
+
+        // Keep only the last 'maxIterations' sets of alert IDs
+        if (sentAlertIds.length > maxIterations * enrichedAlerts.length) {
+          sentAlertIds = sentAlertIds.slice(
+            -maxIterations * enrichedAlerts.length
+          );
+        }
       };
 
       // Initial send

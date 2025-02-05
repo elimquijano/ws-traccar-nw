@@ -34,7 +34,7 @@ const sendPushNotification = async (expoPushToken, title, body, vehicleId) => {
   });
 
   const data = await response.json();
-  console.log(data);
+  console.log(data?.data);
 };
 
 const fetchPushTokenUser = (traccar_id, callback) => {
@@ -57,18 +57,42 @@ const fetchPushTokenUser = (traccar_id, callback) => {
     });
 };
 
-const sendPushNotifications = (traccar_id, deviceid, titulo, mensaje, callback) => {
-  fetchPushTokenUser(traccar_id, (err, users) => {
-    if (err) {
-      return callback(err);
-    }
-
-    users.forEach((user) => {
-      sendPushNotification(user.token, titulo, mensaje, deviceid);
+const sendPushNotifications = async (
+  traccar_id,
+  deviceid,
+  titulo,
+  mensaje,
+  callback
+) => {
+  try {
+    const users = await new Promise((resolve, reject) => {
+      fetchPushTokenUser(traccar_id, (err, users) => {
+        if (err) return reject(err);
+        resolve(users);
+      });
     });
 
-    return callback(null);
-  });
+    if (!users || users.length === 0) {
+      return callback(null, {
+        message: "No users found for push notifications.",
+      });
+    }
+
+    const notificationPromises = users.map((user) => {
+      return new Promise((resolve, reject) => {
+        sendPushNotification(user.token, titulo, mensaje, deviceid, (err) => {
+          if (err) return reject(err);
+          resolve();
+        });
+      });
+    });
+
+    await Promise.all(notificationPromises);
+
+    callback(null, { message: "Push notifications sent successfully." });
+  } catch (error) {
+    callback(error);
+  }
 };
 
 const sendSms = (traccar_id, titulo, mensaje, callback) => {
@@ -88,6 +112,14 @@ const sendSms = (traccar_id, titulo, mensaje, callback) => {
     .request(configGet)
     .then((response) => {
       const phone = response.data.phone;
+
+      // Verificar si el número de teléfono existe y tiene 9 caracteres
+      if (!phone || phone.length !== 9) {
+        console.warn(
+          `El número de teléfono para el usuario ${traccar_id} no es válido.`
+        );
+        return callback(null, { message: "Número de teléfono no válido." });
+      }
 
       // Preparar los datos del SMS tal como funcionan en Postman
       const smsData = {
@@ -149,30 +181,36 @@ const sendNotifications = async (deviceid, titulo, mensaje, callback) => {
       return callback({ message: "No users found for the device." }, null);
     }
 
-    const results = await Promise.all(
-      users.map(async (user) => {
-        const traccar_id = user.userid;
-        try {
-          await Promise.all([
-            new Promise((res, rej) => {
-              sendPushNotifications(traccar_id, deviceid, titulo, mensaje, (err) => {
+    const notificationPromises = users.map(async (user) => {
+      const traccar_id = user.userid;
+      try {
+        await Promise.all([
+          new Promise((res, rej) => {
+            sendPushNotifications(
+              traccar_id,
+              deviceid,
+              titulo,
+              mensaje,
+              (err) => {
                 if (err) rej(err);
                 else res();
-              });
-            }),
-            new Promise((res, rej) => {
-              sendSms(traccar_id, titulo, mensaje, (err) => {
-                if (err) rej(err);
-                else res();
-              });
-            }),
-          ]);
-          return { user: traccar_id, status: "success" };
-        } catch {
-          return { user: traccar_id, status: "failed" };
-        }
-      })
-    );
+              }
+            );
+          }),
+          /* new Promise((res, rej) => {
+            sendSms(traccar_id, titulo, mensaje, (err) => {
+              if (err) rej(err);
+              else res();
+            });
+          }), */
+        ]);
+        return { user: traccar_id, status: "success" };
+      } catch {
+        return { user: traccar_id, status: "failed" };
+      }
+    });
+
+    const results = await Promise.all(notificationPromises);
 
     const hasSuccess = results.some((result) => result.status === "success");
 
