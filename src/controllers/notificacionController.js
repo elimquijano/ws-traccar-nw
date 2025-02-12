@@ -2,27 +2,7 @@ require("dotenv").config();
 const axios = require("axios");
 const { db } = require("../config/db");
 
-const sendPushNotification = async (expoPushToken, title, body, vehicleId) => {
-  const message = {
-    to: expoPushToken,
-    sound: "alarmanoti.wav", // Nombre del archivo de sonido personalizado
-    title: title,
-    body: body,
-    data: {
-      vehicleId: vehicleId,
-      screen: "Maps",
-    },
-    channelId: "custom-channel", // Canal personalizado
-    android: {
-      channelId: "custom-channel",
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: "#FF231F7C",
-    },
-    ios: {
-      sound: "alarmanoti.wav", // Nombre del archivo de sonido personalizado para iOS
-    },
-  };
-
+const sendPushNotification = async (body) => {
   const response = await fetch("https://exp.host/--/api/v2/push/send", {
     method: "POST",
     headers: {
@@ -30,11 +10,11 @@ const sendPushNotification = async (expoPushToken, title, body, vehicleId) => {
       "Accept-encoding": "gzip, deflate",
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(message),
+    body: JSON.stringify(body),
   });
 
   const data = await response.json();
-  console.log(data?.data);
+  //console.log(data?.data);
 };
 
 const fetchPushTokenUser = (traccar_id, callback) => {
@@ -59,9 +39,7 @@ const fetchPushTokenUser = (traccar_id, callback) => {
 
 const sendPushNotifications = async (
   traccar_id,
-  deviceid,
-  titulo,
-  mensaje,
+  data,
   callback
 ) => {
   try {
@@ -81,7 +59,8 @@ const sendPushNotifications = async (
     const notificationPromises = users.map((user) => {
       return new Promise(async (resolve, reject) => {
         try {
-          await sendPushNotification(user.token, titulo, mensaje, deviceid);
+          const body = { ...data, to: user.token };
+          await sendPushNotification(body);
           resolve();
         } catch (error) {
           reject(error);
@@ -165,7 +144,11 @@ const fetchUsersOfDevice = (deviceid, callback) => {
   });
 };
 
-const sendNotifications = async (deviceid, titulo, mensaje, callback) => {
+const sendNotifications = async (
+  deviceid,
+  data,
+  callback
+) => {
   try {
     const users = await new Promise((resolve, reject) => {
       fetchUsersOfDevice(deviceid, (err, results) => {
@@ -185,17 +168,16 @@ const sendNotifications = async (deviceid, titulo, mensaje, callback) => {
           new Promise((res, rej) => {
             sendPushNotifications(
               traccar_id,
-              deviceid,
-              titulo,
-              mensaje,
+              data,
               (err) => {
                 if (err) rej(err);
                 else res();
               }
             );
           }),
+          
           /* new Promise((res, rej) => {
-            sendSms(traccar_id, titulo, mensaje, (err) => {
+            sendSms(traccar_id, data.title, data.body, (err) => {
               if (err) rej(err);
               else res();
             });

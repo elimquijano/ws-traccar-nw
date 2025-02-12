@@ -2,11 +2,14 @@ const express = require("express");
 const WebSocket = require("websocket").server;
 const http = require("http");
 const { getPositions } = require("./controllers/positionsController");
-const { getAlerts, createEventSos } = require("./controllers/alertController");
+const {
+  getAlerts,
+  createEventSos,
+  enviarNotificacion,
+} = require("./controllers/alertController");
 const { getData } = require("./config/constantes");
 const { getDetails } = require("./controllers/detailsController");
 const { detectVehicleChanges } = require("./controllers/devicesController");
-const { sendNotifications } = require("./controllers/notificacionController");
 
 const app = express();
 const server = http.createServer(app);
@@ -24,7 +27,7 @@ const PORT = 7006;
 app.use(express.json());
 
 // API POST NOTIFICACIONES
-app.post("/api/notificacion", (req, res) => {
+/* app.post("/api/notificacion", (req, res) => {
   const { deviceid, titulo, mensaje } = req.body;
   sendNotifications(deviceid, titulo, mensaje, (err, result) => {
     if (err) {
@@ -33,7 +36,7 @@ app.post("/api/notificacion", (req, res) => {
       res.status(200).json(result);
     }
   });
-});
+}); */
 
 // API POST SOS
 app.post("/api/sos", (req, res) => {
@@ -77,10 +80,7 @@ const startDataFetching = () => {
         const existingIds = new Set(latestData.alerts.map((alert) => alert.id));
         const newAlerts = alerts.filter((alert) => !existingIds.has(alert.id));
         latestData.alerts = newAlerts;
-        console.log(
-          new Date().toISOString().slice(0, 19).replace("T", " "),
-          newAlerts.map((alert) => alert.id)
-        );
+        enviarNotificacion(newAlerts);
       }
     });
   }, timeStep);
@@ -120,7 +120,89 @@ wsServer.on("request", async (request) => {
   // Send initial data and setup interval for updates
   let interval;
   switch (path) {
-    case "/positions":
+    case "/":
+      let sentAlertIds = [];
+      const maxIterations = 3;
+
+      const dataSend = async () => {
+        // Filter and combine data
+        const enrichedAlerts = latestData.alerts
+          .filter((alert) =>
+            devices.some((device) => device.id === alert.deviceid)
+          )
+          .map((alert) => {
+            const device = devices.find(
+              (device) => device.id === alert.deviceid
+            );
+            return {
+              ...alert,
+              deviceName: device.name,
+              deviceModel: device.model,
+              deviceStatus: device.status,
+              devicePhone: device.phone,
+              deviceContact: device.contact,
+            };
+          });
+
+        // Filter out already sent alerts
+        const newAlerts = enrichedAlerts.filter(
+          (alert) => !sentAlertIds.includes(alert.id)
+        );
+
+        const beforeDevices = devices;
+        devices = await getData(username, password, details);
+        const changes = detectVehicleChanges(beforeDevices, devices);
+
+        // Enviar los eventos detectados
+        changes.forEach((change) => {
+          connection.send(JSON.stringify(change));
+        });
+
+        const enrichedPositions = latestData.positions
+          .filter((position) =>
+            devices.some((device) => device.id === position.deviceid)
+          )
+          .map((position) => {
+            const device = devices.find(
+              (device) => device.id === position.deviceid
+            );
+            return {
+              ...position,
+              attributes: JSON.parse(position.attributes),
+              icon: device.icon,
+              deviceName: device.name,
+              deviceModel: device.model,
+              deviceStatus: device.status,
+              devicePhone: device.phone,
+              deviceContact: device.contact,
+              deviceCategory: device.category,
+            };
+          });
+
+        // Send combined data
+        connection.send(
+          JSON.stringify({ alerts: newAlerts, positions: enrichedPositions })
+        );
+
+        // Update sent alert IDs
+        sentAlertIds = [
+          ...new Set([...sentAlertIds, ...newAlerts.map((alert) => alert.id)]),
+        ];
+
+        // Keep only the last 'maxIterations' sets of alert IDs
+        if (sentAlertIds.length > maxIterations * enrichedAlerts.length) {
+          sentAlertIds = sentAlertIds.slice(
+            -maxIterations * enrichedAlerts.length
+          );
+        }
+      };
+
+      // Set interval
+      interval = setInterval(() => {
+        dataSend();
+      }, timeStep);
+
+    /* case "/positions":
       const enrichPositions = async () => {
         const beforeDevices = devices;
         devices = await getData(username, password, details);
@@ -216,7 +298,7 @@ wsServer.on("request", async (request) => {
       interval = setInterval(() => {
         enrichAlerts();
       }, timeStep);
-      break;
+      break; */
 
     case "/events":
       connection.on("message", async (message) => {
