@@ -120,7 +120,7 @@ wsServer.on("request", async (request) => {
   // Send initial data and setup interval for updates
   let interval;
   switch (path) {
-    case "/":
+    case "/positions":
       let sentAlertIds = [];
       const maxIterations = 3;
 
