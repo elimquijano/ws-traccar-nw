@@ -2,19 +2,18 @@ require("dotenv").config();
 const axios = require("axios");
 const { db } = require("../config/db");
 
-const sendPushNotification = async (body) => {
-  const response = await fetch("https://exp.host/--/api/v2/push/send", {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Accept-encoding": "gzip, deflate",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
+// Utility functions
 
-  const data = await response.json();
-  //console.log(data?.data);
+const fetchUsersOfDevice = (deviceid, callback) => {
+  const query = `SELECT * FROM tc_user_device WHERE deviceid=${deviceid}`;
+  db.query(query, (err, results) => {
+    if (err) {
+      console.error("Query error:", err);
+      callback(err, null);
+    } else {
+      callback(null, results);
+    }
+  });
 };
 
 const fetchPushTokenUser = (traccar_id, callback) => {
@@ -35,6 +34,23 @@ const fetchPushTokenUser = (traccar_id, callback) => {
       console.error("Request error:", error);
       return callback(error, []);
     });
+};
+
+// Send notifications
+
+const sendPushNotification = async (body) => {
+  const response = await fetch("https://exp.host/--/api/v2/push/send", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Accept-encoding": "gzip, deflate",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+  //console.log(data?.data);
 };
 
 const sendPushNotifications = async (
@@ -132,17 +148,7 @@ const sendSms = async (traccar_id, titulo, mensaje, callback) => {
   }
 };
 
-const fetchUsersOfDevice = (deviceid, callback) => {
-  const query = `SELECT * FROM tc_user_device WHERE deviceid=${deviceid}`;
-  db.query(query, (err, results) => {
-    if (err) {
-      console.error("Query error:", err);
-      callback(err, null);
-    } else {
-      callback(null, results);
-    }
-  });
-};
+// Send notifications to all users of a device
 
 const sendNotifications = async (
   deviceid,

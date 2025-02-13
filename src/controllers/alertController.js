@@ -4,6 +4,7 @@ const { sendNotifications } = require("./notificacionController");
 // Variable global para controlar si hay una consulta en proceso
 let isQueryInProgress = false;
 
+// Variable global para almacenar los IDs de las alertas enviadas
 let sentAlertIds = [];
 const maxIterations = 3;
 
@@ -89,18 +90,14 @@ const createEventSos = (deviceId, callback) => {
   });
 };
 
+// Function to send notifications socket tc_events
+
 const enviarNotificacion = (alertas) => {
   // Filter out already sent alerts
   const newAlerts = alertas.filter((alert) => !sentAlertIds.includes(alert.id));
 
   let data = {};
   for (const alert of newAlerts) {
-    console.log([
-      //new Date().toISOString().slice(0, 19).replace("T", " "),
-      alert.id,
-      alert.type,
-      //alert.eventtime,
-    ]);
     switch (alert.type) {
       case "alarm":
         data = {
@@ -126,6 +123,32 @@ const enviarNotificacion = (alertas) => {
         data = {
           title: "¡Alerta!",
           body: `Encendido del vehiculo ${alert.name}`,
+          data: {
+            vehicleId: alert.deviceid,
+            screen: "Maps",
+          },
+          android: {
+            vibrationPattern: [0, 250, 250, 250],
+          },
+        };
+        break;
+      case "ignitionOff":
+        data = {
+          title: "¡Alerta!",
+          body: `Apagado del vehiculo ${alert.name}`,
+          data: {
+            vehicleId: alert.deviceid,
+            screen: "Maps",
+          },
+          android: {
+            vibrationPattern: [0, 250, 250, 250],
+          },
+        };
+        break;
+      case "powerCut":
+        data = {
+          title: "¡Alerta!",
+          body: `Corte de energía en su vehiculo ${alert.name}`,
           data: {
             vehicleId: alert.deviceid,
             screen: "Maps",

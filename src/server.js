@@ -26,18 +26,6 @@ const PORT = 7006;
 // Middleware para parsear el cuerpo de las solicitudes JSON
 app.use(express.json());
 
-// API POST NOTIFICACIONES
-/* app.post("/api/notificacion", (req, res) => {
-  const { deviceid, titulo, mensaje } = req.body;
-  sendNotifications(deviceid, titulo, mensaje, (err, result) => {
-    if (err) {
-      res.status(500).json(err);
-    } else {
-      res.status(200).json(result);
-    }
-  });
-}); */
-
 // API POST SOS
 app.post("/api/sos", (req, res) => {
   const { deviceid } = req.body;
@@ -100,12 +88,6 @@ wsServer.on("request", async (request) => {
     console.log("Connection rejected: Authentication required");
     return;
   }
-
-  /* getDetails((err, detailsData) => {
-    if (!err) {
-      details = detailsData || [];
-    }
-  }); */
 
   let devices = await getData(username, password, details);
   if (!devices) {
@@ -201,104 +183,6 @@ wsServer.on("request", async (request) => {
       interval = setInterval(() => {
         dataSend();
       }, timeStep);
-
-    /* case "/positions":
-      const enrichPositions = async () => {
-        const beforeDevices = devices;
-        devices = await getData(username, password, details);
-        const changes = detectVehicleChanges(beforeDevices, devices);
-
-        // Enviar los eventos detectados
-        changes.forEach((change) => {
-          connection.send(JSON.stringify(change));
-        });
-
-        const enrichedPositions = latestData.positions
-          .filter((position) =>
-            devices.some((device) => device.id === position.deviceid)
-          )
-          .map((position) => {
-            const device = devices.find(
-              (device) => device.id === position.deviceid
-            );
-            return {
-              ...position,
-              attributes: JSON.parse(position.attributes),
-              icon: device.icon,
-              deviceName: device.name,
-              deviceModel: device.model,
-              deviceStatus: device.status,
-              devicePhone: device.phone,
-              deviceContact: device.contact,
-              deviceCategory: device.category,
-            };
-          });
-
-        connection.send(JSON.stringify({ positions: enrichedPositions }));
-      };
-
-      // Initial send
-      enrichPositions();
-
-      // Set interval
-      interval = setInterval(() => {
-        enrichPositions();
-      }, timeStep);
-      break;
-
-    case "/alerts":
-      let sentAlertIds = [];
-      const maxIterations = 3;
-
-      const enrichAlerts = () => {
-        // Filter and combine data
-        const enrichedAlerts = latestData.alerts
-          .filter((alert) =>
-            devices.some((device) => device.id === alert.deviceid)
-          )
-          .map((alert) => {
-            const device = devices.find(
-              (device) => device.id === alert.deviceid
-            );
-            return {
-              ...alert,
-              deviceName: device.name,
-              deviceModel: device.model,
-              deviceStatus: device.status,
-              devicePhone: device.phone,
-              deviceContact: device.contact,
-            };
-          });
-
-        // Filter out already sent alerts
-        const newAlerts = enrichedAlerts.filter(
-          (alert) => !sentAlertIds.includes(alert.id)
-        );
-
-        // Send combined data
-        connection.send(JSON.stringify({ alerts: newAlerts }));
-
-        // Update sent alert IDs
-        sentAlertIds = [
-          ...new Set([...sentAlertIds, ...newAlerts.map((alert) => alert.id)]),
-        ];
-
-        // Keep only the last 'maxIterations' sets of alert IDs
-        if (sentAlertIds.length > maxIterations * enrichedAlerts.length) {
-          sentAlertIds = sentAlertIds.slice(
-            -maxIterations * enrichedAlerts.length
-          );
-        }
-      };
-
-      // Initial send
-      enrichAlerts();
-
-      // Set interval
-      interval = setInterval(() => {
-        enrichAlerts();
-      }, timeStep);
-      break; */
 
     case "/events":
       connection.on("message", async (message) => {
