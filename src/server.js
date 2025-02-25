@@ -6,6 +6,7 @@ const {
   getAlerts,
   createEventSos,
   enviarNotificacion,
+  sendPushFromApi,
 } = require("./controllers/alertController");
 const { getData } = require("./config/constantes");
 const { getDetails } = require("./controllers/detailsController");
@@ -36,6 +37,13 @@ app.post("/api/sos", (req, res) => {
       res.status(200).json(result);
     }
   });
+});
+
+// API POST NOTIFICACION PUSH
+app.post("/api/notificacion", (req, res) => {
+  const { alert } = req.body;
+  sendPushFromApi(alert);
+  res.status(200).json({ message: "Notificación enviada" });
 });
 
 // WEBSOCKET SERVER

@@ -51,7 +51,7 @@ const createEventSos = (deviceId, callback) => {
     }
 
     if (results.length === 0) {
-      return callback("Device not found", null);
+      return callback(`Device with ID ${deviceId} not found: ${results}`, null);
     }
 
     const { positionid: positionId, name: vehicleName } = results[0];
@@ -89,6 +89,78 @@ const createEventSos = (deviceId, callback) => {
     });
   });
 };
+
+// Function to send notifications api
+
+const sendPushFromApi = (alert) => {
+  switch (alert.type) {
+    case "alarm":
+      data = {
+        sound: "alarmanoti.wav", // Nombre del archivo de sonido personalizado
+        title: "¡Alerta!",
+        body: `Movimiento inusual en su vehiculo ${alert.name}`,
+        data: {
+          vehicleId: alert.deviceid,
+          screen: "Maps",
+        },
+        channelId: "alarm-channel", // Canal personalizado
+        android: {
+          channelId: "alarm-channel",
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: "#FF231F7C",
+        },
+        ios: {
+          sound: "alarmanoti.wav", // Nombre del archivo de sonido personalizado para iOS
+        },
+      };
+      break;
+    case "ignitionOn":
+      data = {
+        title: "¡Alerta!",
+        body: `Encendido del vehiculo ${alert.name}`,
+        data: {
+          vehicleId: alert.deviceid,
+          screen: "Maps",
+        },
+        android: {
+          vibrationPattern: [0, 250, 250, 250],
+        },
+      };
+      break;
+    case "ignitionOff":
+      data = {
+        title: "¡Alerta!",
+        body: `Apagado del vehiculo ${alert.name}`,
+        data: {
+          vehicleId: alert.deviceid,
+          screen: "Maps",
+        },
+        android: {
+          vibrationPattern: [0, 250, 250, 250],
+        },
+      };
+      break;
+    case "powerCut":
+      data = {
+        title: "¡Alerta!",
+        body: `Corte de energía en su vehiculo ${alert.name}`,
+        data: {
+          vehicleId: alert.deviceid,
+          screen: "Maps",
+        },
+        android: {
+          vibrationPattern: [0, 250, 250, 250],
+        },
+      };
+      break;
+    default:
+      data = null;
+      break;
+  }
+  if (data) {
+    sendNotifications(alert.deviceid, data, (err, result) => {});
+  }
+}
 
 // Function to send notifications socket tc_events
 
@@ -182,4 +254,5 @@ module.exports = {
   getAlerts,
   createEventSos,
   enviarNotificacion,
+  sendPushFromApi,
 };
